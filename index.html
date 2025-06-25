@@ -7,7 +7,20 @@
 </head>
 <body>
   <h2>Simple Pong Game</h2>
-  <canvas id="pongCanvas" width="800" height="500"></canvas>
+  <div id="menu">
+    <label for="difficulty">Select Difficulty:</label>
+    <select id="difficulty">
+      <option value="easy">Easy</option>
+      <option value="medium" selected>Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+    <button id="startBtn">Start Game</button>
+  </div>
+  <canvas id="pongCanvas" width="800" height="500" style="display:none"></canvas>
+  <div id="win-message" style="display:none">
+    <div id="win-text"></div>
+    <button id="restartBtn">Restart</button>
+  </div>
   <div id="credit">Made by Aynsley</div>
   <div id="deploy-badge" style="margin-bottom:24px;">
     <a href="https://app.netlify.com/projects/aynsley/deploys" target="_blank" rel="noopener">
