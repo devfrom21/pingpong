@@ -8,10 +8,13 @@ const difficultySel = document.getElementById('difficulty');
 const winMessage = document.getElementById('win-message');
 const winText = document.getElementById('win-text');
 const restartBtn = document.getElementById('restartBtn');
+const soundToggle = document.getElementById('soundToggle');
+const themeSelector = document.getElementById('themeSelector');
 
 // Game objects
 const paddleWidth = 12;
-const paddleHeight = 90;
+let paddleHeight = 90; // variable for powerup
+const basePaddleHeight = 90;
 const paddleMargin = 18;
 const ballRadius = 10;
 
@@ -23,12 +26,17 @@ let hits = 0;
 
 let baseBallSpeed, baseAiSpeed, difficulty;
 let gameRunning = false;
+let soundOn = true;
 
 // Level up every N paddle hits
 const HITS_PER_LEVEL = 6;
 // Score needed to win
 const WIN_SCORE = 5;
 let winner = null;
+
+// Powerup variables
+let powerup = { x: 0, y: 0, active: false, type: '' };
+let powerupTimer = 0;
 
 function setDifficulty(diff) {
   switch (diff) {
@@ -47,6 +55,15 @@ function setDifficulty(diff) {
       break;
   }
   difficulty = diff;
+}
+
+function playSound(id) {
+  if (!soundOn) return;
+  const audio = document.getElementById(id);
+  if (audio) {
+    audio.currentTime = 0;
+    audio.play();
+  }
 }
 
 function drawRect(x, y, w, h, color) {
@@ -68,7 +85,6 @@ function drawText(text, x, y, color, size=32) {
 }
 
 function drawLevel() {
-  // Draw at top center
   ctx.save();
   ctx.globalAlpha = 0.85;
   drawText(`Level: ${level}`, canvas.width/2 - 60, 40, "#ff0", 36);
@@ -78,12 +94,10 @@ function drawLevel() {
 function resetBall() {
   ballX = canvas.width / 2;
   ballY = canvas.height / 2;
-  // Ball direction alternates
   let dir = Math.random() > 0.5 ? 1 : -1;
   ballSpeedX = baseBallSpeed * level * 0.25 * dir;
   ballSpeedY = (baseBallSpeed * 0.6 + Math.random() * 2) * (Math.random() > 0.5 ? 1 : -1);
 
-  // Limit speeds
   ballSpeedX = Math.max(3, Math.min(Math.abs(ballSpeedX), 15)) * dir;
   ballSpeedY = Math.max(2, Math.min(Math.abs(ballSpeedY), 10)) * (ballSpeedY > 0 ? 1 : -1);
 }
@@ -98,6 +112,9 @@ function resetGame() {
   winner = null;
   setDifficulty(difficultySel.value);
   resetBall();
+  paddleHeight = basePaddleHeight;
+  powerup = { x: 0, y: 0, active: false, type: '' };
+  powerupTimer = 0;
 }
 
 function drawNet() {
@@ -106,7 +123,57 @@ function drawNet() {
   }
 }
 
+function spawnPowerup() {
+  if (powerup.active) return;
+  powerup.x = Math.random() * (canvas.width - 60) + 30;
+  powerup.y = Math.random() * (canvas.height - 100) + 30;
+  powerup.type = Math.random() < 0.5 ? 'bigPaddle' : 'slowBall';
+  powerup.active = true;
+}
+
+function drawPowerup() {
+  if (powerup.active) {
+    ctx.fillStyle = powerup.type === 'bigPaddle' ? "#0ff" : "#ff0";
+    ctx.beginPath();
+    ctx.arc(powerup.x, powerup.y, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = "bold 16px Arial";
+    ctx.fillStyle = "#222";
+    ctx.textAlign = "center";
+    ctx.fillText(powerup.type === "bigPaddle" ? "P" : "S", powerup.x, powerup.y + 6);
+    ctx.textAlign = "start";
+  }
+}
+
 function update() {
+  // Powerup timer/spawn
+  powerupTimer++;
+  if (!powerup.active && powerupTimer > 300) { // every 5 seconds
+    spawnPowerup();
+    powerupTimer = 0;
+  }
+
+  // Ball-powerup collision
+  if (
+    powerup.active &&
+    Math.abs(ballX - powerup.x) < ballRadius + 14 &&
+    Math.abs(ballY - powerup.y) < ballRadius + 14
+  ) {
+    if (powerup.type === 'bigPaddle') {
+      paddleHeight *= 1.5;
+      setTimeout(() => { paddleHeight = basePaddleHeight; }, 5000);
+    } else if (powerup.type === 'slowBall') {
+      ballSpeedX *= 0.6;
+      ballSpeedY *= 0.6;
+      setTimeout(() => {
+        ballSpeedX /= 0.6;
+        ballSpeedY /= 0.6;
+      }, 3000);
+    }
+    playSound('hitSound');
+    powerup.active = false;
+  }
+
   // Move ball
   ballX += ballSpeedX;
   ballY += ballSpeedY;
@@ -128,10 +195,9 @@ function update() {
     ballSpeedY = norm * 5;
     ballX = paddleMargin + paddleWidth + ballRadius;
     hits++;
-    // Level up
+    playSound('hitSound');
     if (hits % HITS_PER_LEVEL === 0) {
       level++;
-      // Slightly increase ball and AI speed
       baseBallSpeed += 0.8;
       baseAiSpeed += 0.5;
     }
@@ -149,7 +215,7 @@ function update() {
     ballSpeedY = norm * 5;
     ballX = canvas.width - paddleMargin - paddleWidth - ballRadius;
     hits++;
-    // Level up
+    playSound('hitSound');
     if (hits % HITS_PER_LEVEL === 0) {
       level++;
       baseBallSpeed += 0.8;
@@ -161,11 +227,17 @@ function update() {
   if (ballX < 0) {
     aiScore++;
     hits = 0;
+    playSound('scoreSound');
     resetBall();
+    paddleHeight = basePaddleHeight;
+    powerup.active = false;
   } else if (ballX > canvas.width) {
     playerScore++;
     hits = 0;
+    playSound('scoreSound');
     resetBall();
+    paddleHeight = basePaddleHeight;
+    powerup.active = false;
   }
 
   // AI paddle movement (difficulty adjusted)
@@ -176,41 +248,39 @@ function update() {
   } else if (aiCenter > ballY + 10) {
     aiY -= aiMoveSpeed;
   }
-  // Clamp
   aiY = Math.max(0, Math.min(canvas.height - paddleHeight, aiY));
 }
 
 function checkWin() {
   if (playerScore >= WIN_SCORE) {
     winner = "You Win!";
+    playSound('winSound');
     return true;
   }
   if (aiScore >= WIN_SCORE) {
     winner = "AI Wins!";
+    playSound('winSound');
     return true;
   }
   return false;
 }
 
 function render() {
-  // Clear
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   drawNet();
 
-  // Draw paddles
   drawRect(paddleMargin, playerY, paddleWidth, paddleHeight, '#0ff');
   drawRect(canvas.width - paddleMargin - paddleWidth, aiY, paddleWidth, paddleHeight, '#f0f');
 
-  // Draw ball
   drawCircle(ballX, ballY, ballRadius, '#fff');
 
-  // Draw scores
   drawText(playerScore, canvas.width / 4, 50, '#0ff');
   drawText(aiScore, 3 * canvas.width / 4, 50, '#f0f');
 
-  // Draw level
   drawLevel();
+
+  drawPowerup();
 }
 
 function gameLoop() {
@@ -232,6 +302,16 @@ canvas.addEventListener('mousemove', (e) => {
   playerY = Math.max(0, Math.min(canvas.height - paddleHeight, playerY));
 });
 
+// Touch support for mobile
+canvas.addEventListener('touchmove', function(e) {
+  if (!gameRunning) return;
+  const rect = canvas.getBoundingClientRect();
+  let touch = e.touches[0];
+  playerY = touch.clientY - rect.top - paddleHeight / 2;
+  playerY = Math.max(0, Math.min(canvas.height - paddleHeight, playerY));
+});
+
+// Start button
 startBtn.addEventListener('click', () => {
   setDifficulty(difficultySel.value);
   resetGame();
@@ -242,6 +322,7 @@ startBtn.addEventListener('click', () => {
   gameLoop();
 });
 
+// Restart button
 restartBtn.addEventListener('click', () => {
   setDifficulty(difficultySel.value);
   resetGame();
@@ -273,10 +354,22 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Sound Toggle
+soundToggle.addEventListener('change', function() {
+  soundOn = this.checked;
+});
+
+// Theme Selector
+themeSelector.addEventListener('change', function() {
+  document.body.className = '';
+  canvas.className = '';
+  if (this.value !== 'default') {
+    document.body.classList.add('theme-' + this.value);
+    canvas.classList.add('theme-' + this.value);
+  }
+});
+
 // Show menu on load
 menu.style.display = 'block';
 canvas.style.display = 'none';
 winMessage.style.display = 'none';
-
-// Start game
-gameLoop();
