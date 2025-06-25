@@ -22,3 +22,10 @@ h2 {
   border-radius: 8px;
   border: 2px solid #444;
 }
+
+#credit {
+  color: #aaa;
+  font-size: 1.1em;
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+}
