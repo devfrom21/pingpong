@@ -25,6 +25,7 @@ h2 {
   margin: 0 auto 30px auto;
   border-radius: 8px;
   border: 2px solid #444;
+  transition: background 0.3s, border 0.3s;
 }
 
 #credit {
@@ -87,4 +88,25 @@ h2 {
 }
 #restartBtn:hover {
   background: #444;
+}
+
+#settingsMenu {
+  margin-bottom: 18px;
+}
+
+body.theme-retro {
+  background: #f5deb3;
+  color: #222;
+}
+#pongCanvas.theme-retro {
+  background: #fffbe0;
+  border: 2px solid #f00;
+}
+body.theme-night {
+  background: #000;
+  color: #0ff;
+}
+#pongCanvas.theme-night {
+  background: #222;
+  border: 2px solid #0ff;
 }
